@@ -1,0 +1,46 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ordenamientos</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <h1>Algoritmos de Ordenamiento</h1>
+
+    <div class="controles">
+        <label for="select-tamaño">Tamaño del Arreglo:</label>
+        <select id="select-tamaño">
+            <option value="100">100</option>
+            <option value="1000">1,000</option>
+            <option value="10000">10,000</option>
+            <option value="100000">100,000</option>
+        </select>
+
+        <label for="select-orden">Orden Inicial:</label>
+        <select id="select-orden">
+            <option value="ordenado">Ordenado</option>
+            <option value="semidesordenado">Medianamente Ordenado (50%)</option>
+            <option value="inverso">Inverso</option>
+        </select>
+
+        <button id="btn-iniciar">¡Iniciar Prueba!</button>
+    </div>
+
+    <div class="resultados-container">
+        <div class="grafica-wrapper">
+            <canvas id="miGrafica"></canvas>
+        </div>
+        
+        <div id="tabla-resultados" class="tabla-wrapper">
+            </div>
+    </div>
+    
+    <script src="ordenamientos.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>

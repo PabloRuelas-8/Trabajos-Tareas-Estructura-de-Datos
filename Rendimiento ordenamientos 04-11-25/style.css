@@ -1,0 +1,108 @@
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: #f4f7f6;
+    color: #333;
+    margin: 0;
+    padding: 20px;
+}
+
+h1 {
+    text-align: center;
+    color: #005a9c;
+}
+
+.controles {
+    max-width: 800px;
+    margin: 20px auto;
+    padding: 20px;
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.controles label {
+    font-weight: bold;
+}
+
+.controles select, .controles button {
+    padding: 10px 15px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+.controles button {
+    background-color: #007bff;
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.controles button:hover {
+    background-color: #0056b3;
+}
+
+.controles button:disabled {
+    background-color: #aaa;
+    cursor: not-allowed;
+}
+
+.resultados-container {
+    display: flex;
+    flex-wrap: wrap;
+    max-width: 1200px;
+    margin: 20px auto;
+    gap: 20px;
+}
+
+.grafica-wrapper {
+    flex: 2; 
+    min-width: 400px;
+    padding: 20px;
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.tabla-wrapper {
+    flex: 1;
+    min-width: 300px;
+    padding: 20px;
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+#tabla-resultados h2 {
+    text-align: center;
+    margin-top: 0;
+}
+
+#tabla-resultados table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#tabla-resultados th, #tabla-resultados td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+
+#tabla-resultados th {
+    background-color: #f2f2f2;
+}
+
+#tabla-resultados tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+#tabla-resultados .omitido {
+    color: #999;
+    font-style: italic;
+}
