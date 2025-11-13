@@ -7,6 +7,7 @@
 #include <fstream>
 #include <algorithm>
 #include <ctime>
+#include <cmath>
 
 using namespace std;
 
@@ -30,15 +31,28 @@ bool juegoEnCurso;
 const int ANCHO_TABLERO = 40;
 const int ALTO_TABLERO = 20;
 int puntajeActual;
-int frutasComidas = 0;
+
+int nivelActual;
+int frutasComidasNivelActual;
+int frutasParaSiguienteNivel;
+int velocidadJuego; 
+bool partidaGuardada; 
 
 enum Direccion { DETENIDO = 0, IZQUIERDA, DERECHA, ARRIBA, ABAJO };
 Direccion direccionActual;
 
 list<Coordenada> cuerpoSerpiente;
-list<Coordenada> obstaculos;
+list<Coordenada> trampas; 
 Coordenada posicionComida;
 HANDLE hConsola = GetStdHandle(STD_OUTPUT_HANDLE);
+
+void SiguienteNivel();
+void GenerarTrampa();
+void GuardarPartida();
+bool CargarPartida();
+void MostrarRanking();
+void IniciarBucleJuego();
+
 
 void MoverCursor(int x, int y) {
     COORD coord = { (SHORT)x, (SHORT)y }; SetConsoleCursorPosition(hConsola, coord);
@@ -51,30 +65,45 @@ void OcultarCursorConsola() {
 
 bool EstaOcupado(int x, int y) {
     Coordenada pos = { x, y };
-   
     for (auto const& segmento : cuerpoSerpiente) if (segmento == pos) return true;
-    for (auto const& obs : obstaculos) if (obs == pos) return true;
+    for (auto const& trampa : trampas) if (trampa == pos) return true;
     return false;
 }
 
-void GenerarObstaculo() {
-    Coordenada nuevoObs;
+void GenerarTrampa() {
+    Coordenada nuevaTrampa;
     do {
-        nuevoObs.x = rand() % ANCHO_TABLERO;
-        nuevoObs.y = rand() % ALTO_TABLERO;
-    } while (EstaOcupado(nuevoObs.x, nuevoObs.y) || (nuevoObs == posicionComida));
-    obstaculos.push_back(nuevoObs);
+        nuevaTrampa.x = rand() % ANCHO_TABLERO;
+        nuevaTrampa.y = rand() % ALTO_TABLERO;
+    } while (EstaOcupado(nuevaTrampa.x, nuevaTrampa.y) || (nuevaTrampa == posicionComida));
+    trampas.push_back(nuevaTrampa);
 }
 
 void InicializarJuego() {
-    juegoEnCurso = true; direccionActual = DETENIDO;
-    puntajeActual = 0; frutasComidas = 0;
-    cuerpoSerpiente.clear(); obstaculos.clear();
-    cuerpoSerpiente.push_front({ ANCHO_TABLERO / 2, ALTO_TABLERO / 2 });
-    srand(time(0));
+    juegoEnCurso = true;
+    partidaGuardada = false; 
+    puntajeActual = 0;
+    
+    nivelActual = 1;
+    frutasComidasNivelActual = 0;
+    frutasParaSiguienteNivel = 10;
+    velocidadJuego = 100; 
+    cuerpoSerpiente.clear();
+    trampas.clear();
+    
+    cuerpoSerpiente.push_front({ (ANCHO_TABLERO / 2) + 2, ALTO_TABLERO / 2 });
+    cuerpoSerpiente.push_back({ (ANCHO_TABLERO / 2) + 1, ALTO_TABLERO / 2 });
+    cuerpoSerpiente.push_back({ (ANCHO_TABLERO / 2), ALTO_TABLERO / 2 });
+    cuerpoSerpiente.push_back({ (ANCHO_TABLERO / 2) - 1, ALTO_TABLERO / 2 });
+    cuerpoSerpiente.push_back({ (ANCHO_TABLERO / 2) - 2, ALTO_TABLERO / 2 });
+    
+    direccionActual = DERECHA; 
+
     posicionComida.x = rand() % (ANCHO_TABLERO - 2) + 1;
     posicionComida.y = rand() % (ALTO_TABLERO - 2) + 1;
-    OcultarCursorConsola();
+
+    for(int i = 0; i < 2; i++) GenerarTrampa();
+
 }
 
 void RenderizarJuego() {
@@ -101,9 +130,9 @@ void RenderizarJuego() {
                     }
                 }
                 if (!dibujado) {
-                    for (auto const& obs : obstaculos) {
-                        if (obs == posActual) {
-                            CambiarColor(COLOR_AZUL_CLARO); cout << (char)178;
+                    for (auto const& trampa : trampas) {
+                        if (trampa == posActual) {
+                            CambiarColor(COLOR_AZUL_CLARO); cout << (char)178; 
                             dibujado = true; break;
                         }
                     }
@@ -117,7 +146,10 @@ void RenderizarJuego() {
     CambiarColor(COLOR_GRIS);
     for (int i = 0; i < ANCHO_TABLERO + 2; i++) cout << (char)219; cout << endl;
     CambiarColor(COLOR_BLANCO);
-    cout << "Puntaje: " << puntajeActual << " | Obstaculos: " << obstaculos.size() << endl;
+    
+    cout << "Puntaje: " << puntajeActual << endl;
+    cout << "Nivel: " << nivelActual << endl;
+    cout << "Frutas: " << frutasComidasNivelActual << "/" << frutasParaSiguienteNivel << endl;
 }
 
 void LeerControles() {
@@ -128,8 +160,41 @@ void LeerControles() {
         case 'w': if (direccionActual != ABAJO) direccionActual = ARRIBA; break;
         case 's': if (direccionActual != ARRIBA) direccionActual = ABAJO; break;
         case 'x': juegoEnCurso = false; break;
+        case 'p': 
+            GuardarPartida(); 
+            MoverCursor(0, ALTO_TABLERO + 4); 
+            CambiarColor(COLOR_AMARILLO);
+            cout << "Guardado. Volviendo...";
+            Sleep(1500);
+            partidaGuardada = true; 
+            juegoEnCurso = false; 
+            break;
         }
     }
+}
+
+void SiguienteNivel() {
+    nivelActual++;
+    frutasComidasNivelActual = 0;
+    frutasParaSiguienteNivel += 10; 
+
+    if (velocidadJuego > 30) velocidadJuego -= 10; 
+
+    cuerpoSerpiente.clear();
+    cuerpoSerpiente.push_front({ (ANCHO_TABLERO / 2) + 2, ALTO_TABLERO / 2 });
+    cuerpoSerpiente.push_back({ (ANCHO_TABLERO / 2) + 1, ALTO_TABLERO / 2 });
+    cuerpoSerpiente.push_back({ (ANCHO_TABLERO / 2), ALTO_TABLERO / 2 });
+    cuerpoSerpiente.push_back({ (ANCHO_TABLERO / 2) - 1, ALTO_TABLERO / 2 });
+    cuerpoSerpiente.push_back({ (ANCHO_TABLERO / 2) - 2, ALTO_TABLERO / 2 });
+    direccionActual = DERECHA; 
+
+    int trampasAAgregar = max(1, (int)(trampas.size() * 0.25));
+    for(int i=0; i < trampasAAgregar; i++) GenerarTrampa();
+
+    MoverCursor(ANCHO_TABLERO / 2 - 5, ALTO_TABLERO / 2);
+    CambiarColor(COLOR_AMARILLO);
+    cout << "NIVEL " << nivelActual;
+    Sleep(1000); 
 }
 
 void ActualizarLogica() {
@@ -140,24 +205,41 @@ void ActualizarLogica() {
     case ARRIBA: nuevaCabeza.y--; break; case ABAJO: nuevaCabeza.y++; break;
     }
 
-    if (nuevaCabeza.x >= ANCHO_TABLERO || nuevaCabeza.x < 0 || nuevaCabeza.y >= ALTO_TABLERO || nuevaCabeza.y < 0) {
-        juegoEnCurso = false; return;
-    }
+    if (nuevaCabeza.x >= ANCHO_TABLERO) nuevaCabeza.x = 0;
+    else if (nuevaCabeza.x < 0) nuevaCabeza.x = ANCHO_TABLERO - 1;
+    if (nuevaCabeza.y >= ALTO_TABLERO) nuevaCabeza.y = 0;
+    else if (nuevaCabeza.y < 0) nuevaCabeza.y = ALTO_TABLERO - 1;
+
     for (auto const& segmento : cuerpoSerpiente) {
         if (segmento == nuevaCabeza) { juegoEnCurso = false; return; }
     }
-    for (auto const& obs : obstaculos) {
-        if (obs == nuevaCabeza) { juegoEnCurso = false; return; }
+    
+    bool trampaGolpeadaEsteTurno = false;
+
+    for (auto it = trampas.begin(); it != trampas.end(); ++it) {
+        if (*it == nuevaCabeza) {
+            cuerpoSerpiente.pop_back(); 
+            trampaGolpeadaEsteTurno = true; 
+            
+            if (cuerpoSerpiente.empty()) { 
+                juegoEnCurso = false; 
+                return; 
+            }
+
+            trampas.erase(it); 
+            GenerarTrampa(); 
+            break; 
+        }
     }
 
     cuerpoSerpiente.push_front(nuevaCabeza);
 
-    if (nuevaCabeza == posicionComida) {
-        puntajeActual += 10;
-        frutasComidas++;
+    if (nuevaCabeza == posicionComida && !trampaGolpeadaEsteTurno) {
+        puntajeActual += 10 * nivelActual; 
+        frutasComidasNivelActual++;
 
-        if (frutasComidas % 2 == 0) {
-            GenerarObstaculo();
+        if (frutasComidasNivelActual >= frutasParaSiguienteNivel) {
+            SiguienteNivel();
         }
 
         Coordenada nuevaPosComida;
@@ -168,7 +250,14 @@ void ActualizarLogica() {
         posicionComida = nuevaPosComida;
     }
     else {
-        cuerpoSerpiente.pop_back();
+        if (cuerpoSerpiente.size() > 1) 
+        {
+             cuerpoSerpiente.pop_back();
+        }
+    }
+
+    if (cuerpoSerpiente.empty()) {
+        juegoEnCurso = false;
     }
 }
 
@@ -176,33 +265,207 @@ void GuardarYMostrarRanking(int puntajeFinal) {
     CambiarColor(COLOR_BLANCO); system("cls");
     string nombreArchivo = "ranking_snake.txt";
     vector<RegistroJugador> listaRanking;
+    
     ifstream archivoLectura(nombreArchivo);
     if (archivoLectura.is_open()) {
         RegistroJugador reg;
         while (archivoLectura >> reg.nombre >> reg.puntaje) listaRanking.push_back(reg);
         archivoLectura.close();
     }
+    
+    sort(listaRanking.begin(), listaRanking.end(), [](const RegistroJugador& a, const RegistroJugador& b) { return a.puntaje > b.puntaje; });
+
+    bool esTop5 = false;
     if (puntajeFinal > 0) {
+        if (listaRanking.size() < 5 || puntajeFinal > listaRanking.back().puntaje) {
+            esTop5 = true;
+        }
+
         CambiarColor(COLOR_ROJO_BRILLANTE); cout << "\n--- GAME OVER ---\n";
         CambiarColor(COLOR_BLANCO); cout << "Puntaje final: " << puntajeFinal << endl;
-        cout << "Ingresa tu alias: "; string alias; cin >> alias;
-        listaRanking.push_back({ alias, puntajeFinal });
+        cout << "Nivel alcanzado: " << nivelActual << endl;
+
+        if (esTop5) {
+            cout << "\nEntraste al TOP 5.\n";
+            cout << "Ingresa tu nombre: "; string alias; cin >> alias;
+            listaRanking.push_back({ alias, puntajeFinal });
+            
+            sort(listaRanking.begin(), listaRanking.end(), [](const RegistroJugador& a, const RegistroJugador& b) { return a.puntaje > b.puntaje; });
+            if (listaRanking.size() > 5) listaRanking.resize(5);
+
+            ofstream archivoEscritura(nombreArchivo);
+            for (const auto& reg : listaRanking) {
+                archivoEscritura << reg.nombre << " " << reg.puntaje << endl;
+            }
+            archivoEscritura.close();
+        } else {
+            cout << "\nNo alcanzaste el TOP 5 esta vez.\n";
+        }
     }
-    sort(listaRanking.begin(), listaRanking.end(), [](const RegistroJugador& a, const RegistroJugador& b) { return a.puntaje > b.puntaje; });
-    if (listaRanking.size() > 5) listaRanking.resize(5);
-    ofstream archivoEscritura(nombreArchivo);
+
     CambiarColor(COLOR_AMARILLO); cout << "\n=== TOP 5 ===\n"; CambiarColor(COLOR_BLANCO);
-    for (const auto& reg : listaRanking) {
-        archivoEscritura << reg.nombre << " " << reg.puntaje << endl;
-        cout << reg.nombre << "\t\t" << reg.puntaje << endl;
+    if(listaRanking.empty()) {
+        cout << "Aun no hay puntajes.\n";
+    } else {
+        for (const auto& reg : listaRanking) {
+            cout << reg.nombre << "\t\t" << reg.puntaje << endl;
+        }
     }
 }
 
-int main() {
-    InicializarJuego();
-    while (juegoEnCurso) {
-        RenderizarJuego(); LeerControles(); ActualizarLogica(); Sleep(100);
+
+void GuardarPartida() {
+    string archivoGuardado = "partida_snake.dat";
+    ofstream archivo(archivoGuardado);
+    if (!archivo.is_open()) return;
+
+    archivo << puntajeActual << " "
+            << nivelActual << " "
+            << frutasComidasNivelActual << " "
+            << frutasParaSiguienteNivel << " "
+            << velocidadJuego << " "
+            << (int)direccionActual << endl;
+
+    archivo << posicionComida.x << " " << posicionComida.y << endl;
+
+    archivo << cuerpoSerpiente.size() << endl;
+    for (const auto& segmento : cuerpoSerpiente) {
+        archivo << segmento.x << " " << segmento.y << endl;
     }
-    GuardarYMostrarRanking(puntajeActual);
-    cout << "\nPresiona cualquier tecla..."; _getch(); return 0;
+
+    archivo << trampas.size() << endl;
+    for (const auto& trampa : trampas) {
+        archivo << trampa.x << " " << trampa.y << endl;
+    }
+
+    archivo.close();
+}
+
+bool CargarPartida() {
+    string archivoGuardado = "partida_snake.dat";
+    ifstream archivo(archivoGuardado);
+    if (!archivo.is_open()) return false; 
+
+    cuerpoSerpiente.clear();
+    trampas.clear();
+
+    int dirInt;
+    archivo >> puntajeActual
+            >> nivelActual
+            >> frutasComidasNivelActual
+            >> frutasParaSiguienteNivel
+            >> velocidadJuego
+            >> dirInt;
+    direccionActual = (Direccion)dirInt;
+
+    archivo >> posicionComida.x >> posicionComida.y;
+
+    int tamanoSerpiente;
+    archivo >> tamanoSerpiente;
+    for (int i = 0; i < tamanoSerpiente; i++) {
+        Coordenada segmento;
+        archivo >> segmento.x >> segmento.y;
+        cuerpoSerpiente.push_back(segmento); 
+    }
+
+    int numTrampas;
+    archivo >> numTrampas;
+    for (int i = 0; i < numTrampas; i++) {
+        Coordenada trampa;
+        archivo >> trampa.x >> trampa.y;
+        trampas.push_back(trampa);
+    }
+
+    archivo.close();
+    juegoEnCurso = true; 
+    partidaGuardada = false; 
+    return true;
+}
+
+void IniciarBucleJuego() {
+    while (juegoEnCurso) {
+        RenderizarJuego(); 
+        LeerControles(); 
+        ActualizarLogica(); 
+        Sleep(velocidadJuego);
+    }
+    
+    if (!partidaGuardada) {
+        GuardarYMostrarRanking(puntajeActual);
+        CambiarColor(COLOR_BLANCO);
+        cout << "\n\nPresiona cualquier tecla para volver al menu...";
+        _getch();
+    }
+}
+
+void MostrarRanking() {
+    system("cls");
+    GuardarYMostrarRanking(0); 
+    
+    CambiarColor(COLOR_BLANCO);
+    cout << "\n\nPresiona cualquier tecla para volver al menu...";
+    _getch();
+}
+
+int MostrarMenuPrincipal() {
+    system("cls");
+    
+    CambiarColor(COLOR_BLANCO);
+    cout << "\n\n"
+         << "       1. Jugar (Nueva Partida)\n"
+         << "       2. Cargar Partida\n"
+         << "       3. Ver Ranking\n"
+         << "       4. Salir\n\n"
+         << "       Elige una opcion: ";
+    
+    int opcion;
+    cin >> opcion;
+    return opcion;
+}
+
+
+int main() {
+    OcultarCursorConsola();
+    srand(time(0)); 
+
+    bool salirDelJuego = false;
+    while (!salirDelJuego) {
+        
+        int opcion = MostrarMenuPrincipal();
+
+        switch (opcion) {
+            case 1: 
+                InicializarJuego();
+                IniciarBucleJuego();
+                break;
+            case 2: 
+                system("cls");
+                if (CargarPartida()) {
+                    CambiarColor(COLOR_AMARILLO);
+                    cout << "Partida cargada exitosamente.\nPresiona una tecla para continuar...";
+                    _getch();
+                    IniciarBucleJuego();
+                } else {
+                    CambiarColor(COLOR_ROJO_BRILLANTE);
+                    cout << "No se encontro un archivo de guardado (partida_snake.dat)\n"
+                         << "Presiona una tecla para volver al menu...";
+                    _getch();
+                }
+                break;
+            case 3:
+                MostrarRanking();
+                break;
+            case 4:
+                salirDelJuego = true;
+                break;
+            default:
+                CambiarColor(COLOR_ROJO_BRILLANTE);
+                cout << "Opcion no valida. Presiona una tecla...";
+                _getch();
+                break;
+        }
+    }
+
+    CambiarColor(COLOR_BLANCO); 
+    return 0;
 }
